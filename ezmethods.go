@@ -1,7 +1,7 @@
 package ezsesh
 
 type EzStoreMethods interface {
-	Generate()
+	Generate(assoc string)
 	/*
 		Delete()
 
