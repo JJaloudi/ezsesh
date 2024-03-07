@@ -1,52 +1,59 @@
 package ezsesh
 
 import (
-	"fmt"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"net/http"
+	"time"
 )
 
 type EzStore struct {
 	EzStoreMethods
-	options *EzOptions
-	db      *sqlx.DB
+	Options *EzOptions
 }
 
-func CreateEZStore(options *EzOptions, database *sqlx.DB) *EzStore {
-	return &EzStore{
-		options: options,
-		db:      database,
-	}
+func (store *EzStore) Create(w http.ResponseWriter, assocValue string) error {
+	return errors.New("using the default store, this has nothing implemented yet")
 }
 
-func (store *EzStore) Generate(w http.ResponseWriter, assoc string) {
-	uid := uuid.New()
-	cookie, original := GenerateCookie(uid, store.options)
+func (store *EzStore) GenerateCookieVerifier() (string, string, error) {
+	cBytes := make([]byte, 16)
+	originalBytes := make([]byte, len(cBytes))
 
-	if store.options.SingleToken {
-		query := fmt.Sprintf("DELETE FROM %s WHERE %s = $1", store.options.Table, store.options.Association)
-		_, err := store.db.Exec(query, assoc)
-
-		if err != nil {
-			fmt.Errorf("Failed to delete old session row.", err)
-			return
-		}
-	}
-
-	query := fmt.Sprintf(
-		"insert into %s (session_id, %s, verifier,  expires_at) values ($1, $2, $3, $4) returning session_id",
-		store.options.Table,
-		store.options.Association,
-	)
-
-	fmt.Println(query)
-
-	_, err := store.db.Exec(query, uid.String(), assoc, original, cookie.Cookie.Expires)
+	_, err := rand.Read(cBytes)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return "", "", err
 	}
 
-	http.SetCookie(w, cookie.Cookie)
+	copy(originalBytes, cBytes)
+
+	hash := sha256.New()
+	hash.Write(cBytes)
+
+	return hex.EncodeToString(originalBytes), hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func (store *EzStore) GenerateCookie(id uuid.UUID, options *EzOptions) (*EZCookie, string) {
+	original, verifier, err := store.GenerateCookieVerifier()
+	if err != nil {
+		return nil, ""
+	}
+
+	cookie := &http.Cookie{
+		Name:    options.CookieName,
+		Value:   hex.EncodeToString([]byte(id.String())) + "-" + verifier,
+		Expires: time.Now().Add(time.Duration(options.Lifetime) * time.Minute),
+
+		HttpOnly: options.HttpOnly,
+		Secure:   options.Secure,
+		SameSite: options.SameSite,
+	}
+
+	return &EZCookie{
+		Cookie: cookie,
+		ID:     id,
+	}, original
 }
