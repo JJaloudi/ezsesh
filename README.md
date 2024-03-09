@@ -1,7 +1,7 @@
 # EZSesh - The Simple Session Store
 
 
-I created EZSesh to handle internal application session management. When using other FOSS session management tools, I found their implementation to hide away too much abstraction. 
+I created EZSesh to handle internal application session management. When using other FOSS session management tools, I found their implementation to hide away too much functionality with abstraction and their generic methods to be too invasive in their implementations. 
 The development of this package is to avoid all of that. Writing your own stores should be easy, you should be able to dictate everything down to the hashing and storing of cookies.
 
 I want to ultimately leave every step of cookie generation up to the developer, while maintaining Go's concurrency & following industry standard session management practices.
