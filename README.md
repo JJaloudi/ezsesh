@@ -8,8 +8,10 @@ I want to ultimately leave every step of cookie generation up to the developer, 
 
 ----
 
+# FYI
+
 Currently, this package is a WIP, primarily the development now is focused on handling my internal usecases, however, the direction during development is to create tons of genericism so that DX can be 
-tailored to any project and developer.
+tailored to any project and developer. But right now, the lib does not include any documentation in the code. This will change over the coming weeks for anyone that manages to find this repo :)
 
 
 As of now, I recommend against using this package, as there are multiple cybersec items that need to be tested and cleared, like session fixation, hijacking, timeouts & other basic stuff. As of now,
