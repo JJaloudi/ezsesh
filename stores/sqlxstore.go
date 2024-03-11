@@ -1,15 +1,12 @@
 package stores
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jjaloudi/ezsesh"
 	"github.com/jmoiron/sqlx"
 	"net/http"
-	"time"
+	"reflect"
 )
 
 type EzSqlxStore struct {
@@ -26,7 +23,7 @@ func CreateEZSqlxStore(options *ezsesh.EzOptions, database *sqlx.DB) *EzSqlxStor
 
 func (store *EzSqlxStore) Create(w http.ResponseWriter, assoc string) error {
 	uid := uuid.New()
-	cookie, original := store.GenerateCookie(uid)
+	cookie, original := ezsesh.GenerateCookie(store.Options, ezsesh.StripUUID(uid.String()))
 
 	if store.Options.SingleToken {
 		query := fmt.Sprintf("DELETE FROM %s WHERE %s = $1", store.Options.Table, store.Options.Association)
@@ -53,55 +50,21 @@ func (store *EzSqlxStore) Create(w http.ResponseWriter, assoc string) error {
 	return err
 }
 
-func (store *EzSqlxStore) GenerateCookieVerifier() (string, string, error) {
-	cBytes := make([]byte, 16)
-	originalBytes := make([]byte, len(cBytes))
-
-	_, err := rand.Read(cBytes)
-	if err != nil {
-		return "", "", err
-	}
-
-	copy(originalBytes, cBytes)
-
-	hash := sha256.New()
-	hash.Write(cBytes)
-
-	return hex.EncodeToString(originalBytes), hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-func (store *EzSqlxStore) GenerateCookie(id uuid.UUID) (*ezsesh.EZCookie, string) {
-	options := store.Options
-
-	original, verifier, err := store.GenerateCookieVerifier()
-	if err != nil {
-		return nil, ""
-	}
-
-	cookie := &http.Cookie{
-		Name:    options.CookieName,
-		Value:   hex.EncodeToString([]byte(id.String())) + "-" + verifier,
-		Expires: time.Now().Add(time.Duration(options.Lifetime) * time.Minute),
-
-		HttpOnly: options.HttpOnly,
-		Secure:   options.Secure,
-		SameSite: options.SameSite,
-	}
-
-	return &ezsesh.EZCookie{
-		Cookie: cookie,
-		ID:     id,
-	}, original
-}
-
-func (store *EzSqlxStore) GetUserSession(assocValue string) (session interface{}, err error) {
+func (store *EzSqlxStore) GetByAssociation(assocValue string) (session interface{}, err error) {
 	query := fmt.Sprintf("select * from %s where %s = $1", store.Options.Table, store.Options.Association)
 	err = store.db.Select(session, query, assocValue)
 
 	return session, err
 }
 
-func (store *EzSqlxStore) GetSessionByID(sessionId string) error {
+func (store *EzSqlxStore) GetSessionByID(sessionId string, destination interface{}) error {
+	query := fmt.Sprintf("select * from %s where session_id = $1", store.Options.Table)
+
+	destPtr := reflect.ValueOf(destination)
+	if err := store.db.QueryRowx(query, sessionId).StructScan(destPtr.Interface()); err != nil {
+		return nil
+	}
+
 	return nil
 }
 
